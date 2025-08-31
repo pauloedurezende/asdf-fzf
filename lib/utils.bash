@@ -7,6 +7,41 @@ GH_REPO="https://github.com/junegunn/fzf"
 TOOL_NAME="fzf"
 TOOL_TEST="fzf --version"
 
+# Detect the operating system
+get_os() {
+	local os
+	os=$(uname -s | tr '[:upper:]' '[:lower:]')
+	case "$os" in
+		linux) echo "linux" ;;
+		darwin) echo "darwin" ;;
+		*) fail "Unsupported operating system: $os" ;;
+	esac
+}
+
+# Detect and map architecture to fzf naming convention
+get_arch() {
+	local arch
+	arch=$(uname -m)
+	case "$arch" in
+		x86_64 | amd64) echo "amd64" ;;
+		aarch64 | arm64) echo "arm64" ;;
+		armv7l) echo "armv7" ;;
+		armv6l) echo "armv6" ;;
+		armv5*) echo "armv5" ;;
+		*) fail "Unsupported architecture: $arch" ;;
+	esac
+}
+
+# Check if required tools are available
+check_dependencies() {
+	if ! command -v curl >/dev/null 2>&1; then
+		fail "curl is required but not installed"
+	fi
+	if ! command -v tar >/dev/null 2>&1; then
+		fail "tar is required but not installed"
+	fi
+}
+
 fail() {
 	echo -e "asdf-$TOOL_NAME: $*"
 	exit 1
@@ -37,14 +72,21 @@ list_all_versions() {
 }
 
 download_release() {
-	local version filename url
+	local version filename url os arch
 	version="$1"
 	filename="$2"
+	
+	# Check dependencies before attempting download
+	check_dependencies
+	
+	# Detect system OS and architecture
+	os=$(get_os)
+	arch=$(get_arch)
+	
+	# Construct the binary release URL
+	url="$GH_REPO/releases/download/${version}/fzf-${version}-${os}_${arch}.tar.gz"
 
-	# TODO: Adapt the release URL convention for fzf
-	url="$GH_REPO/archive/v${version}.tar.gz"
-
-	echo "* Downloading $TOOL_NAME release $version..."
+	echo "* Downloading $TOOL_NAME release $version for $os/$arch..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
 }
 
@@ -59,9 +101,17 @@ install_version() {
 
 	(
 		mkdir -p "$install_path"
-		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
+		
+		# Copy the fzf binary to the install path
+		# Binary releases contain the fzf executable directly
+		if [ -f "$ASDF_DOWNLOAD_PATH/fzf" ]; then
+			cp "$ASDF_DOWNLOAD_PATH/fzf" "$install_path/"
+			chmod +x "$install_path/fzf"
+		else
+			fail "fzf binary not found in $ASDF_DOWNLOAD_PATH"
+		fi
 
-		# TODO: Assert fzf executable exists.
+		# Verify the fzf executable exists and is executable
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
 		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
