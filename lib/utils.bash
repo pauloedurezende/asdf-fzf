@@ -83,8 +83,8 @@ download_release() {
 	os=$(get_os)
 	arch=$(get_arch)
 	
-	# Construct the binary release URL
-	url="$GH_REPO/releases/download/${version}/fzf-${version}-${os}_${arch}.tar.gz"
+	# Construct the binary release URL (fzf uses 'v' prefix in tags)
+	url="$GH_REPO/releases/download/v${version}/fzf-${version}-${os}_${arch}.tar.gz"
 
 	echo "* Downloading $TOOL_NAME release $version for $os/$arch..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
